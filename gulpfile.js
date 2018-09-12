@@ -13,6 +13,17 @@ const wait = require('gulp-wait');
 const sourcemaps = require('gulp-sourcemaps');
 const babel = require('gulp-babel');
 const plumber = require('gulp-plumber');
+const gap = require('gulp-append-prepend');
+const rename = require('gulp-rename');
+
+gulp.task('copy', () => 
+    gulp.src('path.json')
+    .pipe(gap.prependText('const path = '))
+    .pipe(rename('path.js'))
+    .pipe(gulp.dest('./static/scripts/js'))
+);
+
+gulp.watch('path.json', ['copy']);
 
 gulp.task('browser-sync', () =>
     browserSync.init({
@@ -28,7 +39,7 @@ gulp.task('js', () =>
     .pipe(wait(500))
     .pipe(sourcemaps.init())
     .pipe(babel({
-        presets: ['env', 'es2015', 'stage-0']
+        presets: ['env', 'es2015', 'stage-0'],
     }))
     .pipe(concat('main.js'))
     .pipe(sourcemaps.write())

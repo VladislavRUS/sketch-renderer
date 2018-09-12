@@ -20,50 +20,66 @@ const drawPath = async () => {
         if (idx === 0) {
             continue;
         }
-    
+
         if (idx === 1) {
             const { width, height } = elem.size;
             canvas = document.createElement('canvas');
             canvas.width = width;
             canvas.height = height;
-    
+
             ctx = canvas.getContext('2d');
             ctx.fillStyle = '#fff';
             ctx.rect(0, 0, width, height);
             ctx.fill();
-    
+
             document.querySelector('.main').appendChild(canvas);
-    
+
         } else {
             const { width, height } = elem.size;
-            const { x , y } = elem.position;
+            const { x, y } = elem.position;
             const style = elem.style;
-    
+
             if (style && style.fills) {
+                ctx.save();
+
                 style.fills.forEach(fill => {
                     if (!fill.isEnabled) {
                         return;
                     }
-    
+
+                    if (style.contextSettings && style.contextSettings.opacty) {
+                        canvas.globalAlpha = style.contextSettings.opacity
+                    }
+
                     const { red, green, blue, alpha } = fill.color;
                     ctx.fillStyle = `rgba(${red * 255}, ${green * 255}, ${blue * 255}, ${alpha})`;
                     ctx.fillRect(x, y, width, height);
                 });
+
+                ctx.restore();
             }
-    
+
             if (style && style.borders) {
+                ctx.save();
+
+                if (style.contextSettings && style.contextSettings.opacty) {
+                    canvas.globalAlpha = style.contextSettings.opacity
+                }
+
                 style.borders.forEach(border => {
                     if (!border.isEnabled) {
                         return;
                     }
-    
+
                     const { red, green, blue, alpha } = border.color;
                     ctx.strokeWidth = style.thickness;
                     ctx.strokeStyle = `rgba(${red * 255}, ${green * 255}, ${blue * 255}, ${alpha})`;
                     ctx.strokeRect(x - 0.5, y - 0.5, width, height);
                 });
+
+                ctx.restore();
             }
-    
+
             if (elem.image && elem.visible) {
                 let sX = 0;
                 let sY = 0;
@@ -89,7 +105,7 @@ const drawPath = async () => {
                     sX = Math.abs(elemLeft - parentLeft);
                     dX += sX;
                 }
-                
+
                 if (elemRight > parentRight) {
                     sWidth = parentRight - elemLeft - sX;
                 }
@@ -107,14 +123,15 @@ const drawPath = async () => {
                 if (elemBottom > parentBottom) {
                     sHeight = parentBottom - sY;
                 }
-                
-                if (elem.id === 'D456EEE1-D60E-4D54-91D9-9FC88B9E31A6') {
-                    debugger;
-                }
-
-                console.log(elem);
 
                 await drawImage(ctx, elem, sX, sY, sWidth, sHeight, dX, dY);
+            }
+
+            if (elem.string) {
+                ctx.font = `${elem.fontSize}px ${elem.fontFamily}`;
+                const {red, green, blue, alpha } = elem.color;
+                ctx.fillStyle = `rgba(${red}, ${green}, ${blue}, ${alpha})`;
+                ctx.fillText(elem.string, x, y);
             }
         }
     }

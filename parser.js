@@ -1,6 +1,6 @@
 const fs = require('fs');
 
-const file = './sketch/file/pages/5E630D4A-659B-4138-82E7-FA087D55F1E2.json';
+const file = './sketch/file/pages/28E6E355-F2E2-4A98-B30E-209BEF1E767F.json';
 
 const data = JSON.parse(fs.readFileSync(file));
 
@@ -85,7 +85,14 @@ const walkThrough = (data, path, plainList) => {
     const style = data.style;
     
     const pathItem = {
-        id, name, className, visible, position, size, style, hasChildren: !!data.layers
+        id,
+        name,
+        className,
+        visible,
+        position,
+        size,
+        style,
+        hasChildren: !!data.layers
     };
 
     if (className === classes.bitmap) {
@@ -112,6 +119,14 @@ const walkThrough = (data, path, plainList) => {
         }
 
         pathItem.image = '/assets/' + data.image._ref + '.png';
+    }
+
+    if (className === classes.text) {
+        const attrs = data.attributedString.attributes[0].attributes;
+        pathItem.string = data.attributedString.string;
+        pathItem.color = attrs.MSAttributedStringColorAttribute;
+        pathItem.fontSize = attrs.MSAttributedStringFontAttribute.attributes.size;
+        pathItem.fontFamily = attrs.MSAttributedStringFontAttribute.attributes.name;
     }
 
     path.push(pathItem);
