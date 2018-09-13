@@ -18,12 +18,8 @@ const rename = require('gulp-rename');
 
 gulp.task('copy', () => 
     gulp.src('path.json')
-    .pipe(gap.prependText('const path = '))
-    .pipe(rename('path.js'))
-    .pipe(gulp.dest('./static/scripts/js'))
+    .pipe(gulp.dest('./static'))
 );
-
-gulp.watch('path.json', ['copy']);
 
 gulp.task('browser-sync', () =>
     browserSync.init({
@@ -39,7 +35,7 @@ gulp.task('js', () =>
     .pipe(wait(500))
     .pipe(sourcemaps.init())
     .pipe(babel({
-        presets: ['env', 'es2015', 'stage-0'],
+        presets: ['env']
     }))
     .pipe(concat('main.js'))
     .pipe(sourcemaps.write())
@@ -93,6 +89,7 @@ gulp.task('watch', () => {
     gulp.watch(config.scss.watch, ['scss']);
     gulp.watch(config.js.watch, ['js', browserSync.reload]);
     gulp.watch(config.html.watch, browserSync.reload);
+    gulp.watch('path.json', ['copy']);
 });
 
 gulp.task('assets:prod', () => 

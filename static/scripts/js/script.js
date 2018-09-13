@@ -1,6 +1,74 @@
 let canvas;
 let ctx;
 
+const CLASSES = {
+    PAGE: 'page',
+    ARTBOARD: 'artboard',
+    GROUP: 'group',
+    SHAPE_GROUP: 'shapeGroup',
+    SHAPE_PATH: 'shapePath',
+    RECTANGLE: 'rectangle',
+    OVAL: 'oval',
+    TEXT: 'text',
+    BITMAP: 'bitmap'
+};
+
+const processPage = (page) => {
+    const pageName = page.name;
+    const artboard = page.layers[0];
+    const artboardWidth = artboard.frame.width;
+    const artboardHeight = artboard.frame.height;
+
+    canvas = document.createElement('canvas');
+    canvas.width = artboardWidth;
+    canvas.height = artboardHeight;
+
+    ctx = canvas.getContext('2d');
+
+    document.body.appendChild(canvas);
+
+    const rootLayers = artboard.layers;
+
+    drawLayer(rootLayers[11]);
+    //rootLayers.forEach(layer => drawLayer(layer));
+};
+
+const drawLayer = (layer, path) => {
+    if (!path) {
+        path = [];
+    }
+
+    let shiftX = layer.frame.x;
+    let shiftY = layer.frame.y;
+
+    path.forEach(p => {
+        shiftX += p.frame.x;
+        shiftY += p.frame.y;
+    });
+
+    const _class = layer._class;
+    ctx.strokeStyle = '#000';
+
+    if (layer.name === 'Rectangle Copy 2') {
+        debugger;
+    }
+
+    console.log(path.length, layer.name, shiftX, shiftY);
+    ctx.strokeRect(shiftX, shiftY, layer.frame.width, layer.frame.height);
+
+    path.push(layer);
+    
+    if (layer.layers) {
+        layer.layers.forEach(child => drawLayer(child, path));
+    } else {
+        const exists = path.find(p => p.do_objectID === layer.do_objectID);
+        
+        if (exists) {
+            path.splice(path.length - 1, 1);
+        }
+    }
+};
+
 const drawImage = (ctx, elem, sX, sY, sWidth, sHeight, dX, dY) => {
     return new Promise((resolve, reject) => {
         const img = new Image();
@@ -13,7 +81,7 @@ const drawImage = (ctx, elem, sX, sY, sWidth, sHeight, dX, dY) => {
     });
 };
 
-const drawPath = async () => {
+const drawPath = async (path) => {
     for (let idx = 0; idx < path.length; idx++) {
         const elem = path[idx];
 
@@ -24,6 +92,7 @@ const drawPath = async () => {
         if (idx === 1) {
             const { width, height } = elem.size;
             canvas = document.createElement('canvas');
+            canvas.style.position = 'relative';
             canvas.width = width;
             canvas.height = height;
 
@@ -35,6 +104,7 @@ const drawPath = async () => {
             document.querySelector('.main').appendChild(canvas);
 
         } else {
+
             const { width, height } = elem.size;
             const { x, y } = elem.position;
             const style = elem.style;
@@ -72,9 +142,9 @@ const drawPath = async () => {
                     }
 
                     const { red, green, blue, alpha } = border.color;
-                    ctx.strokeWidth = style.thickness;
+                    ctx.lineWidth = border.thickness;
                     ctx.strokeStyle = `rgba(${red * 255}, ${green * 255}, ${blue * 255}, ${alpha})`;
-                    ctx.strokeRect(x - 0.5, y - 0.5, width, height);
+                    ctx.strokeRect(x, y, width, height);
                 });
 
                 ctx.restore();
@@ -128,13 +198,101 @@ const drawPath = async () => {
             }
 
             if (elem.string) {
-                ctx.font = `${elem.fontSize}px ${elem.fontFamily}`;
                 const {red, green, blue, alpha } = elem.color;
-                ctx.fillStyle = `rgba(${red}, ${green}, ${blue}, ${alpha})`;
-                ctx.fillText(elem.string, x, y);
+                const div = document.createElement('div');
+                const splittedText = elem.string.split('\r');
+                if (splittedText.length > 0) {
+                    splittedText.forEach(text => {
+                        const textDiv = document.createElement('div');
+                        textDiv.innerHTML = text;
+                        div.appendChild(textDiv);
+                    });
+
+                    div.style.display = 'flex';
+                    div.style.flexDirection = 'column';
+                    div.style.justifyContent = 'space-between';
+                } else {
+                    div.innerHTML = splittedText[0];
+                }
+                div.style.fontSize = `${elem.fontSize}px`;
+                const fontFamilySplitted = elem.fontFamily.split('-');
+                div.style.fontFamily = `${fontFamilySplitted[0]}, sans-serif`;
+                div.style.color = `rgba(${255 * red}, ${255 * green}, ${255 * blue}, ${alpha})`;
+                div.style.position = 'absolute';
+                div.style.left = x;
+                div.style.top = y;
+                div.style.width = width;
+                div.style.height = height;
+                div.style.letterSpacing = elem.letterSpacing;
+                div.style.whiteSpace = 'nowrap';
+                if (fontFamilySplitted[1] === 'Bold') {
+                    div.style.fontWeight = '700';
+                }
+
+                if (fontFamilySplitted[1] === 'Regular') {
+                    div.style.fontWeight = '400';
+                }
+
+                if (fontFamilySplitted[1] === 'Light') {
+                    div.style.fontWeight = '300';
+                }
+
+                
+                if (elem.data.style.textStyle.encodedAttributes.MSAttributedStringTextTransformAttribute === 1) {
+                    div.style.textTransform = 'uppercase';
+                }
+
+                document.body.appendChild(div);
+            }
+
+            const shapePath = elem.data.layers && elem.data.layers.find(layer => layer._class === 'shapePath');
+
+            if (elem.data.layers && shapePath) {
+                continue;
+            }
+
+            if (elem.data.points) {
+
+                const points = [];
+                elem.data.points.forEach(point => {
+                    const splitted = point.point.split(',');;
+                    const x = splitted[0].substring(1);
+                    const y = splitted[1].substring(1, splitted[1].length - 1);
+                    points.push({
+                        x: x * width,
+                        y: y * height
+                    });
+                });
+
+                const color = elem.parent.style.fills[0].color;
+                const { red, green, blue, alpha } = color;
+
+                const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+                svg.setAttribute('width', 22);
+                svg.setAttribute('height', 22);
+                svg.setAttribute('viewBox', '0 0 22 22');
+                const newpath = document.createElementNS('http://www.w3.org/2000/svg',"polyline"); 
+                newpath.setAttributeNS(
+                    null, 
+                    "points", 
+                    points.map(point => `${point.x} ${point.y}`).join(' '));
+                
+                svg.appendChild(newpath);
+                newpath.setAttribute('fill', `rgba(${255 * red}, ${255 * green}, ${blue * 255}, ${alpha})`);
+                svg.style.position = 'absolute';
+                svg.style.left = x;
+                svg.style.top = y;
+                document.body.appendChild(svg);
             }
         }
     }
 };
 
-drawPath();
+var oReq = new XMLHttpRequest();
+oReq.open("GET", "/28E6E355-F2E2-4A98-B30E-209BEF1E767F.json");
+oReq.send();
+oReq.onload = (resp) => {
+    const page = JSON.parse(resp.target.response);
+    console.log(page);
+    processPage(page);
+}

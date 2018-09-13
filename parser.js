@@ -95,14 +95,16 @@ const walkThrough = (data, path, plainList) => {
         hasChildren: !!data.layers
     };
 
+    const parent = plainList.find(elem => {
+        return elem.layers && elem.layers.find(layer => layer.do_objectID === data.do_objectID);
+    });
+
+    const pathParent = path.find(p => p.id === parent.do_objectID);
+
     if (className === classes.bitmap) {
         if (data.clippingMask) {
             
-            const parent = plainList.find(elem => {
-                return elem.layers && elem.layers.find(layer => layer.do_objectID === data.do_objectID);
-            });
-
-            const pathParent = path.find(p => p.id === parent.do_objectID);
+            
 
             pathItem.parentSize = {
                 width: pathParent.size.width,
@@ -127,7 +129,12 @@ const walkThrough = (data, path, plainList) => {
         pathItem.color = attrs.MSAttributedStringColorAttribute;
         pathItem.fontSize = attrs.MSAttributedStringFontAttribute.attributes.size;
         pathItem.fontFamily = attrs.MSAttributedStringFontAttribute.attributes.name;
+        pathItem.letterSpacing = attrs.kerning;
+        pathItem.lineHeight = data.lineSpacingBehaviour;
     }
+
+    pathItem.parent = parent;
+    pathItem.data = data;
 
     path.push(pathItem);
 
