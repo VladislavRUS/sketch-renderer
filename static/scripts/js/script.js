@@ -50,7 +50,7 @@ const processPage = (page) => {
     canvas.width = artboardWidth;
     canvas.height = artboardHeight;
 
-    ctx = canvas.getContext('2d');
+    paper.setup(canvas);
 
     document.body.appendChild(canvas);
     const plainList = [];
@@ -60,6 +60,45 @@ const processPage = (page) => {
 
     rootLayers.forEach(layer => drawLayer(layer, plainList));
 };
+
+const getCoordsFromPoint = (point) => {
+    const splitted = point.split(',');
+    const x = parseFloat(splitted[0].substring(1));
+    const y = parseFloat(splitted[1].substring(1, splitted[1].length - 1));
+
+    return { x, y };
+}
+
+const getBorder = (layer) => {
+    if (layer.style && layer.style.borders) {
+        const border = layer.style.borders[0];
+
+        if (border.isEnabled) {
+            const { red, green, blue, alpha } = border.color;
+            return {
+                strokeColor: `rgba(${red * 255}, ${green * 255}, ${blue * 255}, ${alpha})`,
+                lineWidth: border.thickness
+            }
+        }
+    }
+
+    return null;
+}
+
+const getFill = (layer) => {
+    if (layer.style && layer.style.fills) {
+        const fill = layer.style.fills[0];
+
+        if (fill.isEnabled) {
+            const { red, green, blue, alpha } = fill.color;
+            return {
+                color: `rgba(${red * 255}, ${green * 255}, ${blue * 255}, ${alpha})`
+            }
+        }
+    }
+
+    return null;
+}
 
 const drawLayer = (layer, plainList) => {
     let shiftX = layer.frame.x;
@@ -75,14 +114,74 @@ const drawLayer = (layer, plainList) => {
     });
 
     const _class = layer._class;
-
+        
     if (_class === CLASSES.SHAPE_GROUP) {
-        ctx.strokeStyle = '#000';
-
-        ctx.strokeRect(shiftX, shiftY, layer.frame.width, layer.frame.height);
+        const border = getBorder(layer);
+        const fill = getFill(layer);
 
         layer.layers.forEach(l => {
-            console.log(l.points);
+            const { width, height } = l.frame;
+            const pathClass = l._class;
+            let path;
+
+            if (pathClass === CLASSES.RECTANGLE) {
+                const rect = new paper.Path.Rectangle(shiftX, shiftY, width, height);
+
+                if (fill) {
+                    rect.fillColor = fill.color;
+                }
+
+                if (border) {
+                    rect.strokeColor = border.strokeColor;
+                    rect.lineWidth = border.lineWidth;
+                }
+
+                path = new paper.Path(rect);
+
+            } else if (pathClass === CLASSES.OVAL || pathClass === CLASSES.SHAPE_PATH) {
+                path = new paper.Path();
+                
+                l.path.points.forEach(point => {
+                    const p = getCoordsFromPoint(point.point);
+
+                    [p].forEach(c => {
+                        c.x = c.x * width + shiftX;
+                        c.y = c.y * height + shiftY;
+                    });
+                    
+                    path.add(new paper.Point(p.x, p.y))
+                });
+
+                path.closed = l.path.isClosed;
+
+                if (pathClass === CLASSES.OVAL) {
+                    path.smooth();
+                }
+                
+                if (fill) {
+                    path.fillColor = fill.color;
+                }
+
+                if (border) {
+                    path.strokeColor = border.strokeColor;
+                    path.lineWidth = border.lineWidth;
+                }
+            }
+
+            if (!path) {
+                return;
+            }
+
+            paper.view.draw();
+
+            // l.path.points.forEach(point => {
+            //     const p = point.point;
+            //     const splittedPoint = p.split(',');
+            //     const x = parseInt(splittedPoint[0].slice(1)) * width + shiftX;
+            //     const y = parseInt(splittedPoint[1].substring(1, splittedPoint[1].length - 1)) * height + shiftY;
+            //     path.add(new paper.Point(x, y));
+            // });
+
         });
     }
 
@@ -317,6 +416,5 @@ oReq.open("GET", "/28E6E355-F2E2-4A98-B30E-209BEF1E767F.json");
 oReq.send();
 oReq.onload = (resp) => {
     const page = JSON.parse(resp.target.response);
-    console.log(page);
     processPage(page);
 }

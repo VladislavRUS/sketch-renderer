@@ -2,6 +2,7 @@ module.exports = {
     js: {
         src: [
             'node_modules/babel-polyfill/dist/polyfill.js',
+            'node_modules/paper/dist/paper-core.min.js',
             'static/scripts/js/*.js'
         ],
         dest: 'static/scripts',
