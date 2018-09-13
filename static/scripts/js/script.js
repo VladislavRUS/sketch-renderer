@@ -75,9 +75,16 @@ const drawLayer = (layer, plainList) => {
     });
 
     const _class = layer._class;
-    ctx.strokeStyle = '#000';
 
-    ctx.strokeRect(shiftX, shiftY, layer.frame.width, layer.frame.height);
+    if (_class === CLASSES.SHAPE_GROUP) {
+        ctx.strokeStyle = '#000';
+
+        ctx.strokeRect(shiftX, shiftY, layer.frame.width, layer.frame.height);
+
+        layer.layers.forEach(l => {
+            console.log(l.points);
+        });
+    }
 
     path.push(layer);
     
