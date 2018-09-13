@@ -13,6 +13,33 @@ const CLASSES = {
     BITMAP: 'bitmap'
 };
 
+const fillPlainList = (data, plainList) => {
+    if (data._class !== CLASSES.ARTBOARD) {
+        plainList.push(data);
+    }
+
+    if (data.layers) {
+        data.layers.forEach(child => fillPlainList(child, plainList));
+    }
+};
+
+const getPathToLayer = (plainList, path) => {
+    const lastInsterted = path[path.length - 1];
+
+    const parent = plainList.find(elem => {
+        if (!elem.layers) {
+            return false;
+        } else {
+            return !!elem.layers.find(layer => layer.do_objectID === lastInsterted.do_objectID);
+        }
+    });
+
+    if (parent) {
+        path.push(parent);
+        getPathToLayer(plainList, path);
+    }
+};
+
 const processPage = (page) => {
     const pageName = page.name;
     const artboard = page.layers[0];
@@ -26,20 +53,21 @@ const processPage = (page) => {
     ctx = canvas.getContext('2d');
 
     document.body.appendChild(canvas);
-
+    const plainList = [];
+    
     const rootLayers = artboard.layers;
+    fillPlainList(page, plainList);
 
-    drawLayer(rootLayers[11]);
-    //rootLayers.forEach(layer => drawLayer(layer));
+    rootLayers.forEach(layer => drawLayer(layer, plainList));
 };
 
-const drawLayer = (layer, path) => {
-    if (!path) {
-        path = [];
-    }
-
+const drawLayer = (layer, plainList) => {
     let shiftX = layer.frame.x;
     let shiftY = layer.frame.y;
+
+    const path = [ layer ];
+    getPathToLayer(plainList, path);
+    path.splice(0, 1);
 
     path.forEach(p => {
         shiftX += p.frame.x;
@@ -49,23 +77,12 @@ const drawLayer = (layer, path) => {
     const _class = layer._class;
     ctx.strokeStyle = '#000';
 
-    if (layer.name === 'Rectangle Copy 2') {
-        debugger;
-    }
-
-    console.log(path.length, layer.name, shiftX, shiftY);
     ctx.strokeRect(shiftX, shiftY, layer.frame.width, layer.frame.height);
 
     path.push(layer);
     
     if (layer.layers) {
-        layer.layers.forEach(child => drawLayer(child, path));
-    } else {
-        const exists = path.find(p => p.do_objectID === layer.do_objectID);
-        
-        if (exists) {
-            path.splice(path.length - 1, 1);
-        }
+        layer.layers.forEach(child => drawLayer(child, plainList));
     }
 };
 
