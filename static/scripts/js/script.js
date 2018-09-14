@@ -40,6 +40,35 @@ const getPathToLayer = (plainList, path) => {
     }
 };
 
+const createSVG = (points, color, x, y, fillColor, strokeColor, lineWidth, fillRule) => {
+    const { red, green, blue, alpha } = color;
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute('width', 22);
+    svg.setAttribute('height', 22);
+    svg.setAttribute('viewBox', '0 0 22 22');
+    const newpath = document.createElementNS('http://www.w3.org/2000/svg', "path");
+    newpath.setAttributeNS(
+        null,
+        "d",
+        points
+    );
+
+    svg.appendChild(newpath);
+    if (fillColor) {
+        newpath.setAttribute('fill', `${fillColor}`);
+    }
+    if (strokeColor) {
+        newpath.setAttribute('stroke', `${strokeColor}`);
+    }
+
+    newpath.setAttribute('fill-rule', fillRule);
+
+    svg.style.position = 'absolute';
+    svg.style.left = x;
+    svg.style.top = y;
+    document.querySelector('.main').appendChild(svg);
+}
+
 const processPage = (page) => {
     const pageName = page.name;
     const artboard = page.layers[0];
@@ -52,9 +81,9 @@ const processPage = (page) => {
 
     paper.setup(canvas);
 
-    document.body.appendChild(canvas);
+    document.querySelector('.main').appendChild(canvas);
     const plainList = [];
-    
+
     const rootLayers = artboard.layers;
     fillPlainList(page, plainList);
 
@@ -104,7 +133,7 @@ const drawLayer = (layer, plainList) => {
     let shiftX = layer.frame.x;
     let shiftY = layer.frame.y;
 
-    const path = [ layer ];
+    const path = [layer];
     getPathToLayer(plainList, path);
     path.splice(0, 1);
 
@@ -114,12 +143,17 @@ const drawLayer = (layer, plainList) => {
     });
 
     const _class = layer._class;
-        
+
+    if (!layer.isVisible) {
+        return;
+    }
+
     if (_class === CLASSES.SHAPE_GROUP) {
         const border = getBorder(layer);
         const fill = getFill(layer);
 
         layer.layers.forEach(l => {
+            
             const { width, height } = l.frame;
             const pathClass = l._class;
             let path;
@@ -138,26 +172,28 @@ const drawLayer = (layer, plainList) => {
 
                 path = new paper.Path(rect);
 
-            } else if (pathClass === CLASSES.OVAL || pathClass === CLASSES.SHAPE_PATH) {
+            } else if (pathClass === CLASSES.OVAL) {
                 path = new paper.Path();
-                
-                l.path.points.forEach(point => {
+
+                const points = l.points;
+
+                points.forEach(point => {
                     const p = getCoordsFromPoint(point.point);
 
                     [p].forEach(c => {
                         c.x = c.x * width + shiftX;
                         c.y = c.y * height + shiftY;
                     });
-                    
+
                     path.add(new paper.Point(p.x, p.y))
                 });
 
-                path.closed = l.path.isClosed;
+                path.closed = l.isClosed;
 
                 if (pathClass === CLASSES.OVAL) {
                     path.smooth();
                 }
-                
+
                 if (fill) {
                     path.fillColor = fill.color;
                 }
@@ -166,6 +202,133 @@ const drawLayer = (layer, plainList) => {
                     path.strokeColor = border.strokeColor;
                     path.lineWidth = border.lineWidth;
                 }
+
+            } else if (pathClass === CLASSES.SHAPE_PATH) {
+                const points = l.points;
+
+                const segments = [];
+
+                const { x, y } = layer.frame;
+                const SVGPoints = [];
+                const start = points[0];
+                const startCoords = getCoordsFromPoint(start.point);
+
+                let fillRule = layer.windingRule === 0 ? 'nonzero' : 'evenodd';
+
+                let pointsPath = `M${startCoords.x * width} ${startCoords.y * height}`;
+
+                points.forEach(point => {
+                    const current = getCoordsFromPoint(point.point);
+                    const currentFrom = getCoordsFromPoint(point.curveFrom);
+                    const currentTo = getCoordsFromPoint(point.curveTo);
+
+                    if (point.hasCurveTo) {
+                        SVGPoints.push({
+                            x: currentTo.x * width,
+                            y: currentTo.y * height,
+                        });
+                    };
+
+                    SVGPoints.push({
+                        x: current.x * width,
+                        y: current.y * height,
+                    });
+
+                    if (point.hasCurveFrom) {
+                        SVGPoints.push({
+                            x: currentFrom.x * width,
+                            y: currentFrom.y * height,
+                        });
+                    };
+
+                    const p1 = {
+                        x: currentTo.x * width,
+                        y: currentTo.y * height
+                    };
+
+                    const p2 = {
+                        x: currentFrom.x * width,
+                        y: currentFrom.y * height
+                    };
+
+                    const p3 = {
+                        x: current.x * width,
+                        y: current.y * height
+                    }
+
+                    pointsPath += `C ${(p1.x)} ${(p1.y)}, ${(p2.x)} ${(p2.y)}, ${(p3.x)} ${(p3.y)} `;
+                });
+                
+                let fillColor;
+                let strokeColor;
+                let lineWidth = 1;
+
+                if (fill) {
+                    fillColor = fill.color;
+                }
+
+                if (border) {
+                    strokeColor = border.strokeColor;
+                    lineWidth = border.lineWidth;
+                }
+
+                if (layer.isClosed) {
+                    pointsPath += 'Z';
+                }
+
+                createSVG(pointsPath, { red: 0, green: 1, blue: 1, alpha: 1 }, shiftX, shiftY, fillColor, strokeColor, lineWidth, fillRule);
+
+                // points.forEach((point, idx) => {
+                //     const n = idx === points.length - 1 ? points[0] : points[idx + 1];
+                //     const current = getCoordsFromPoint(point.point);
+                //     const currentFrom = getCoordsFromPoint(point.curveFrom);
+                //     const currentTo = getCoordsFromPoint(point.curveTo);
+                //     const next = getCoordsFromPoint(n.point);
+                //     const nextFrom = getCoordsFromPoint(n.curveFrom);
+                //     const nextTo = getCoordsFromPoint(n.curveTo);
+
+                //     [current, currentFrom, currentTo, next, nextFrom, nextTo].forEach(c => {
+                //         c.x = c.x * width + shiftX;
+                //         c.y = c.y * height + shiftY;
+                //     });
+
+                //     const currentPoint = new paper.Point(current.x, current.y);
+                //     const currentFromPoint = new paper.Point(currentFrom.x, currentFrom.y);
+                //     const currentToPoint = new paper.Point(currentTo.x, currentTo.y);
+                //     const nextPoint = new paper.Point(next.x, next.y);
+                //     const nextPointFrom = new paper.Point(nextFrom.x, nextFrom.y);
+                //     const nextPointTo = new paper.Point(nextTo.x, nextTo.y);
+
+                //     const firstSegment = new paper.Segment({
+                //         point: currentPoint,
+                //         //handleIn: point.hasCurveFrom && currentFromPoint || null,
+                //         //handleOut: point.hasCurveTo && currentToPoint || null
+                //     });
+
+                //     const secondSegment = new paper.Segment({
+                //         point: nextPoint,
+                //         //handleIn: n.hasCurveFrom && nextPointFrom || null,
+                //         //handleOut: n.hasCurveTo && nextPointTo || null
+                //     });
+
+                //     segments.push(firstSegment, secondSegment);
+                //});
+
+
+                // path = new paper.Path({
+                //     segments: [...segments]
+                // });
+
+                // path.closed = l.isClosed;
+
+                // if (fill) {
+                //     path.fillColor = fill.color;
+                // }
+
+                // if (border) {
+                //     path.strokeColor = border.strokeColor;
+                //     path.lineWidth = border.lineWidth;
+                // }
             }
 
             if (!path) {
@@ -183,10 +346,84 @@ const drawLayer = (layer, plainList) => {
             // });
 
         });
+    }  else if (_class === CLASSES.TEXT) {
+        const str = layer.attributedString.string;
+        let attrs = layer.attributedString.attributes[0];
+        const letterSpacing = attrs.kerning;
+        
+        attrs = attrs.attributes;
+
+        let red, green, blue, alpha;
+
+        const color = attrs.MSAttributedStringColorAttribute;
+
+        if (!color) {
+            red = 0;
+            green = 0;
+            blue = 0;
+            alpha = 1;
+
+        } else {
+            red = color.red;
+            green = color.green;
+            blue = color.blue;
+            alpha = color.alpha;
+        }
+
+        const { name, size } = attrs.MSAttributedStringFontAttribute.attributes;
+        const splittedName = name.split('-');
+        
+        let fontWeight = '400'
+        if (splittedName.length > 1) {
+            if (splittedName[1] === 'Bold') {
+                fontWeight = '700';
+            } else if(splittedName[1] === 'Light') {
+                fontWeight = '300';
+            }
+        }
+
+        const div = document.createElement('div');
+        div.style.position = 'absolute';
+        div.style.left = shiftX;
+        div.style.top = shiftY;
+        div.style.fontFamily = splittedName[0];
+        div.style.fontSize = size;
+        div.style.height = layer.frame.height;
+        div.style.display = 'flex';
+        div.style.color = `rgba(${red * 255}, ${green * 255}, ${blue * 255}, ${alpha})`;
+        div.fontWeight = fontWeight;
+        
+        if (attrs.MSAttributedStringTextTransformAttribute === 1) {
+            div.style.textTransform = 'uppercase';
+        }
+
+        if (str.includes('\r')) {
+            str.split('\r').forEach(str => {
+                const divText = document.createElement('div');
+                divText.innerHTML = str;
+                div.appendChild(divText);
+            });
+
+            div.style.flexDirection = 'column';
+            div.style.justifyContent = 'space-between';
+        } else {
+            div.innerHTML = str;
+            div.style.lineHeight = (attrs.paragraphStyle && attrs.paragraphStyle.maximumLineHeight || layer.frame.height) + 'px';
+        }
+
+        document.querySelector('.main').appendChild(div);
+    } else if (_class === CLASSES.BITMAP) {
+        const img = document.createElement('img');
+        img.setAttribute('src', '/assets/' + layer.image._ref);
+        img.style.width = layer.frame.width;
+        img.style.height = layer.frame.height;
+        img.style.position = 'absolute';
+        img.style.left = shiftX;
+        img.style.top = shiftY;
+
+        document.querySelector('.main').appendChild(img);
     }
 
-    path.push(layer);
-    
     if (layer.layers) {
         layer.layers.forEach(child => drawLayer(child, plainList));
     }
@@ -321,7 +558,7 @@ const drawPath = async (path) => {
             }
 
             if (elem.string) {
-                const {red, green, blue, alpha } = elem.color;
+                const { red, green, blue, alpha } = elem.color;
                 const div = document.createElement('div');
                 const splittedText = elem.string.split('\r');
                 if (splittedText.length > 0) {
@@ -340,7 +577,9 @@ const drawPath = async (path) => {
                 div.style.fontSize = `${elem.fontSize}px`;
                 const fontFamilySplitted = elem.fontFamily.split('-');
                 div.style.fontFamily = `${fontFamilySplitted[0]}, sans-serif`;
+                
                 div.style.color = `rgba(${255 * red}, ${255 * green}, ${255 * blue}, ${alpha})`;
+                
                 div.style.position = 'absolute';
                 div.style.left = x;
                 div.style.top = y;
@@ -360,7 +599,7 @@ const drawPath = async (path) => {
                     div.style.fontWeight = '300';
                 }
 
-                
+
                 if (elem.data.style.textStyle.encodedAttributes.MSAttributedStringTextTransformAttribute === 1) {
                     div.style.textTransform = 'uppercase';
                 }
@@ -394,12 +633,12 @@ const drawPath = async (path) => {
                 svg.setAttribute('width', 22);
                 svg.setAttribute('height', 22);
                 svg.setAttribute('viewBox', '0 0 22 22');
-                const newpath = document.createElementNS('http://www.w3.org/2000/svg',"polyline"); 
+                const newpath = document.createElementNS('http://www.w3.org/2000/svg', "polyline");
                 newpath.setAttributeNS(
-                    null, 
-                    "points", 
+                    null,
+                    "points",
                     points.map(point => `${point.x} ${point.y}`).join(' '));
-                
+
                 svg.appendChild(newpath);
                 newpath.setAttribute('fill', `rgba(${255 * red}, ${255 * green}, ${blue * 255}, ${alpha})`);
                 svg.style.position = 'absolute';
@@ -412,7 +651,7 @@ const drawPath = async (path) => {
 };
 
 var oReq = new XMLHttpRequest();
-oReq.open("GET", "/28E6E355-F2E2-4A98-B30E-209BEF1E767F.json");
+oReq.open("GET", "/E1C62095-BB32-466A-AD2C-5006882BE5C0.json");
 oReq.send();
 oReq.onload = (resp) => {
     const page = JSON.parse(resp.target.response);

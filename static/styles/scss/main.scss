@@ -1,14 +1,13 @@
 @import '../../../node_modules/reset-css/_reset';
 
 .main {
-    position: relative;
+    position: absolute;
     margin: 0 auto;
+    margin-left: 50%;
+    transform: translateX(-50%);
 }
 
 canvas {
-    position: absolute;
-    left: 0;
-    top: 0;
     display: block;
     box-shadow: 0 1px 10px -2px rgba(0, 0, 0, 0.2);
 }
